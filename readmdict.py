@@ -22,6 +22,7 @@ from io import BytesIO
 import re
 import sys
 import json
+from glob import glob
 
 from ripemd128 import ripemd128
 from pureSalsa20 import Salsa20
@@ -918,19 +919,24 @@ if __name__ == '__main__':
         mdx = None
 
     # find companion mdd file
-    mdd_filename = ''.join([base, os.path.extsep, 'mdd'])
-    if os.path.exists(mdd_filename):
-        mdd = MDD(mdd_filename, args.passcode)
-        if type(mdd_filename) is unicode:
-            bfname = mdd_filename.encode('utf-8')
-        else:
-            bfname = mdd_filename
-        print('======== %s ========' % bfname)
-        print('  Number of Entries : %d' % len(mdd))
-        for key, value in mdd.header.items():
-            print('  %s : %s' % (key, value))
+    mdd_filenames = glob(os.path.normpath("%s*.mdd" % base))
+
+    if len(mdd_filenames) > 0:
+        mdds = []
+        for mdd_filename in mdd_filenames:
+            mdd = MDD(mdd_filename, args.passcode)
+
+            if type(mdd_filename) is unicode:
+                bfname = mdd_filename.encode('utf-8')
+            else:
+                bfname = mdd_filename
+            print('======== %s ========' % bfname)
+            print('  Number of Entries : %d' % len(mdd))
+            for key, value in mdd.header.items():
+                print('  %s : %s' % (key, value))
+            mdds.append(mdd)
     else:
-        mdd = None
+        mdds = None
 
     if args.extract:
         # write out glos
@@ -952,15 +958,17 @@ if __name__ == '__main__':
                 sf.write(b'\r\n'.join(mdx.header['StyleSheet'].splitlines()))
                 sf.close()
         # write out optional data files
-        if mdd:
+        if len(mdds) > 0:
             datafolder = os.path.join(os.path.dirname(args.filename), args.datafolder)
             if not os.path.exists(datafolder):
                 os.makedirs(datafolder)
-            for key, value in mdd.items():
-                fname = key.decode('utf-8').replace('\\', os.path.sep)
-                dfname = datafolder + fname
-                if not os.path.exists(os.path.dirname(dfname)):
-                    os.makedirs(os.path.dirname(dfname))
-                df = open(dfname, 'wb')
-                df.write(value)
-                df.close()
+
+            for mdd in mdds:
+                for key, value in mdd.items():
+                    fname = key.decode('utf-8').replace('\\', os.path.sep)
+                    dfname = datafolder + fname
+                    if not os.path.exists(os.path.dirname(dfname)):
+                        os.makedirs(os.path.dirname(dfname))
+                    df = open(dfname, 'wb')
+                    df.write(value)
+                    df.close()
